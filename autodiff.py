@@ -149,7 +149,6 @@ class Tensor:
         """
         if self.tensor_type == "pow":
             self.a.backpropagate(gradient * self.b.val * self.a.val ** (self.b.val - 1))
-            # self.b.backpropagate(gradient * self.a.val ** self.b.val * np.log(self.a.val))
 
         """ y = A @ B
             dy/dA = B.T
@@ -179,17 +178,6 @@ class Tensor:
                 else np.ones_like(self.b.val, dtype=np.float64)
 
             self.b.backpropagate(gradient * _sigmoid_derivative(self.val))
-
-        """ y = (y_hat - y) ** 2
-            dy/dA = 2 * (y_hat - y)
-        """
-        if self.tensor_type == "mse_loss":
-            gradient = gradient if gradient is not None \
-                else np.ones_like(self.b.val, dtype=np.float64)
-
-            dloss_ = self.val.backpropagate()
-            self.b.backpropagate(gradient * dloss_)
-
 
     def _force_np_array(self, val: ValidInput, dtype=np.float64) -> np.ndarray:
         if val is None or isinstance(val, Tensor):
