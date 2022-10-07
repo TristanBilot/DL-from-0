@@ -32,12 +32,13 @@ class Tensor:
         tensor.tensor_type = "mul"
         return tensor
 
-    def __div__(self, other):
+    def __truediv__(self, other):
         tensor = Tensor(val=self.val / other.val, a=self, b=other)
         tensor.tensor_type = "div"
         return tensor
 
     def __pow__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         tensor = Tensor(val=self.val ** other.val, a=self, b=other)
         tensor.tensor_type = "pow"
         return tensor
@@ -48,11 +49,25 @@ class Tensor:
         tensor.tensor_type = "matmul"
         return tensor
 
-    def sigmoid(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        tensor = Tensor(val=_sigmoid(other.val), a=self, b=other)
+    def sum(self, input: 'Tensor', axis: int=None, keepdims: bool=False):
+        input = input if isinstance(input, Tensor) else Tensor(input)
+        tensor = Tensor(val=np.sum(input.val, axis=axis, keepdims=keepdims), a=self, b=input)
+        tensor.tensor_type = "sum"
+        return tensor
+
+    def sigmoid(self, input: 'Tensor'):
+        input = input if isinstance(input, Tensor) else Tensor(input)
+        tensor = Tensor(val=_sigmoid(input.val), a=self, b=input)
         tensor.tensor_type = "sigmoid"
         return tensor
+
+    def mse_loss(self, y_hat: 'Tensor', y: 'Tensor'):
+        y_hat = y_hat if isinstance(y_hat, Tensor) else Tensor(y_hat)
+        y = y if isinstance(y, Tensor) else Tensor(y)
+        n = Tensor(y_hat.val.size)
+        sum = Tensor().sum
+        val = (sum((y_hat - y) ** Tensor(2))) / n
+        return val
 
     def __repr__(self) -> str:
         if self.tensor_type == "var":
@@ -77,7 +92,13 @@ class Tensor:
             return f"({self.a} . {self.b})"
 
         if self.tensor_type == "sigmoid":
-            return f"sig({self})"
+            return f"sig({self.v})"
+
+        if self.tensor_type == "mse_loss":
+            return f"mse_loss({self.b})"
+
+        if self.tensor_type == "sum":
+            return f"sum({self.b})"
 
     def backpropagate(self, gradient=None):
         """ y = a
@@ -115,8 +136,12 @@ class Tensor:
             dy/db = -a / b ** 2
         """
         if self.tensor_type == "div":
-            self.a.backpropagate(gradient * 1 / self.b.val)
-            self.b.backpropagate(gradient * -self.a.val / self.b.val ** 2)
+            gradient_a = gradient if gradient is not None \
+                else np.ones_like(self.a.val.T, dtype=np.float64)
+            gradient_b = gradient if gradient is not None \
+                else np.ones_like(self.b.val.T, dtype=np.float64)
+            self.a.backpropagate(gradient_a * 1 / self.b.val)
+            self.b.backpropagate(gradient_b * -self.a.val / self.b.val ** 2)
 
         """ y = a ** b
             dy/da = b * a ** b-1
@@ -124,7 +149,7 @@ class Tensor:
         """
         if self.tensor_type == "pow":
             self.a.backpropagate(gradient * self.b.val * self.a.val ** (self.b.val - 1))
-            self.b.backpropagate(gradient * self.a.val ** self.b.val * np.log(self.a.val))
+            # self.b.backpropagate(gradient * self.a.val ** self.b.val * np.log(self.a.val))
 
         """ y = A @ B
             dy/dA = B.T
@@ -137,6 +162,15 @@ class Tensor:
             self.a.backpropagate(np.dot(gradient, self.b.val.T))
             self.b.backpropagate(np.dot(self.a.val.T, gradient))
 
+        """ y = sum(A)
+            dy/dA = np.ones_like(A)
+        """
+        if self.tensor_type == "sum":
+            gradient = gradient if gradient is not None \
+                else np.ones_like(self.b.val, dtype=np.float64)
+
+            self.b.backpropagate(gradient * np.ones_like(self.val))
+
         """ y = sigmoid(a)
             dy/dA = sigmoid(a) * (1 - sigmoid(a))
         """
@@ -146,26 +180,46 @@ class Tensor:
 
             self.b.backpropagate(gradient * _sigmoid_derivative(self.val))
 
+        """ y = (y_hat - y) ** 2
+            dy/dA = 2 * (y_hat - y)
+        """
+        if self.tensor_type == "mse_loss":
+            gradient = gradient if gradient is not None \
+                else np.ones_like(self.b.val, dtype=np.float64)
 
-    def _force_np_array(self, val: ValidInput) -> np.ndarray:
-        if val is None:
-            return None
-        if isinstance(val, np.ndarray):
+            dloss_ = self.val.backpropagate()
+            self.b.backpropagate(gradient * dloss_)
+
+
+    def _force_np_array(self, val: ValidInput, dtype=np.float64) -> np.ndarray:
+        if val is None or isinstance(val, Tensor):
             return val
-        else:
-            return np.asarray(val)
+        return np.asarray(val, dtype=dtype)
 
         
 if __name__ == '__main__':
-    W1 = Tensor(np.array([[-0.5,  0.5], [-2,  2]]))
-    b1 = Tensor(np.array([[1.2,  1.2], [1.2,  1.2]]))
-    W2 = Tensor(np.array([[-1.5,  1.5], [-2,  2]]))
-    b2 = Tensor(np.array([[0.6,  0.7], [1.2,  1.2]]))
+    # W1 = Tensor(np.array([[-0.5,  0.5], [-2,  2]]))
+    # b1 = Tensor(np.array([[1.2,  1.2], [1.2,  1.2]]))
+    # W2 = Tensor(np.array([[-1.5,  1.5], [-2,  2]]))
+    # b2 = Tensor(np.array([[0.6,  0.7], [1.2,  1.2]]))
 
-    X = Tensor(np.array([[-2,  2], [1.5, 1.5]]))
-    sig = Tensor().sigmoid
+    # X = Tensor(np.array([[-2,  2], [1.5, 1.5]]))
+    # sig = Tensor().sigmoid
+    # mse = Tensor().mse_loss
 
-    c = sig(W2 @ sig(W1 @ X + b1) + b2)
+    # c = mse(W1, W2)
+    # # c = sig(W2 @ sig(W1 @ X + b1) + b2)
+    # c.backpropagate()
+
+    # print(f'{W2.gradient}')
+
+    a = np.array([[-0.5], [-2]])
+    b = np.array([[1.2], [1.2]])
+    y_hat = Tensor(a)
+    y = Tensor(b)
+
+    mse = Tensor().mse_loss
+    c = mse(y_hat, y)
     c.backpropagate()
 
-    print(f'{W2.gradient}')
+    print(f'{y_hat.gradient}')
