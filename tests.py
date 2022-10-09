@@ -215,3 +215,51 @@ def test_2_layers_mse():
     dy_hat_W2_torch = W2_torch.grad.cpu().detach().numpy()
 
     assert np.all(np.round(W2.gradient, 4) == np.round(dy_hat_W2_torch, 4))
+
+
+def test_xor():
+    """Tests a basic MLP with two hidden layers and MSE loss
+    """
+    # (4, 2)
+    X = ad.Tensor(np.array([
+        [0., 0.],
+        [0., 1.],
+        [1., 0.],
+        [1., 1.],
+    ]))
+    # (4, 1)
+    y = ad.Tensor(np.array([
+        [1.],
+        [0.],
+        [1.],
+        [0.],
+    ]))
+    
+    W1 = ad.Tensor(np.random.randn(2, 50))
+    W2 = ad.Tensor(np.random.randn(50, 1))
+    b1 = ad.Tensor(np.random.randn(50))
+    b2 = ad.Tensor(np.random.randn(1))
+
+    sig = ad.Tensor().sigmoid
+    mse = ad.Tensor().mse_loss
+
+    epochs = 1000
+    lr = 0.001
+    for i in range(epochs + 1):
+        # (4, 2) @ (2, 50) = (4, 50)
+        layer1 = sig(X @ W1 + b1)
+        # (4,50) @ (50, 1) = (4, 1)
+        y_hat = sig(layer1 @ W2 + b2)
+
+        loss = mse(y_hat, y)
+        loss.backpropagate()
+
+        W1.val = W1.val - lr * W1.gradient
+        W2.val = W2.val - lr * W2.gradient
+
+    def test(input):
+        layer1 = sig(input @ W1 + b1)
+        y_hat = sig(layer1 @ W2 + b2)
+        return np.round(y_hat.val)
+
+    assert np.all(test(X) == y.val)

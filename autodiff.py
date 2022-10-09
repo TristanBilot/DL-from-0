@@ -92,7 +92,7 @@ class Tensor:
             return f"({self.a} . {self.b})"
 
         if self.tensor_type == "sigmoid":
-            return f"sig({self.v})"
+            return f"sig({self.b})"
 
         if self.tensor_type == "mse_loss":
             return f"mse_loss({self.b})"
@@ -105,7 +105,7 @@ class Tensor:
             dy/da = 1
         """
         if self.tensor_type == "var":
-            self.gradient += gradient
+            self.gradient = self.gradient + gradient
         
         """ y = a + b
             dy/da = 1
