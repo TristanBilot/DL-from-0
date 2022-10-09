@@ -256,6 +256,8 @@ def test_xor():
 
         W1.val = W1.val - lr * W1.gradient
         W2.val = W2.val - lr * W2.gradient
+        b1.val = b1.val - lr * b1.gradient
+        b2.val = b2.val - lr * b2.gradient
 
     def test(input):
         layer1 = sig(input @ W1 + b1)
