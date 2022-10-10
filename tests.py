@@ -265,3 +265,5 @@ def test_xor():
         return np.round(y_hat.val)
 
     assert np.all(test(X) == y.val)
+
+test_xor()
