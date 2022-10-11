@@ -101,6 +101,8 @@ class Tensor:
             return f"sum({self.b})"
 
     def backpropagate(self, gradient=None):
+        gradient = gradient if gradient is not None \
+            else np.ones_like(self.val, dtype=np.float64)
         """ y = a
             dy/da = 1
         """
@@ -136,12 +138,8 @@ class Tensor:
             dy/db = -a / b ** 2
         """
         if self.tensor_type == "div":
-            gradient_a = gradient if gradient is not None \
-                else np.ones_like(self.a.val.T, dtype=np.float64)
-            gradient_b = gradient if gradient is not None \
-                else np.ones_like(self.b.val.T, dtype=np.float64)
-            self.a.backpropagate(gradient_a * 1 / self.b.val)
-            self.b.backpropagate(gradient_b * -self.a.val / self.b.val ** 2)
+            self.a.backpropagate(gradient * 1 / self.b.val)
+            self.b.backpropagate(gradient * -self.a.val / self.b.val ** 2)
 
         """ y = a ** b
             dy/da = b * a ** b-1
@@ -155,9 +153,6 @@ class Tensor:
             dy/dB = A.T
         """
         if self.tensor_type == "matmul":
-            gradient = gradient if gradient is not None \
-                else np.ones_like(self.b.val.T, dtype=np.float64)
-
             self.a.backpropagate(np.dot(gradient, self.b.val.T))
             self.b.backpropagate(np.dot(self.a.val.T, gradient))
 
@@ -165,24 +160,26 @@ class Tensor:
             dy/dA = np.ones_like(A)
         """
         if self.tensor_type == "sum":
-            gradient = gradient if gradient is not None \
-                else np.ones_like(self.b.val, dtype=np.float64)
-
             self.b.backpropagate(gradient * np.ones_like(self.val))
 
         """ y = sigmoid(a)
             dy/dA = sigmoid(a) * (1 - sigmoid(a))
         """
         if self.tensor_type == "sigmoid":
-            gradient = gradient if gradient is not None \
-                else np.ones_like(self.b.val, dtype=np.float64)
-
             self.b.backpropagate(gradient * _sigmoid_derivative(self.val))
 
     def _force_np_array(self, val: ValidInput, dtype=np.float64) -> np.ndarray:
         if val is None or isinstance(val, Tensor):
             return val
         return np.asarray(val, dtype=dtype)
+
+    @property
+    def shape(self):
+        return self.val.shape
+
+    @classmethod
+    def randn(self, *shape):
+        return Tensor(np.random.randn(*shape))
 
         
 if __name__ == '__main__':

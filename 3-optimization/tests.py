@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import autodiff as ad
+from layers import Linear, MSE, Sigmoid, Model
+from optimizers import SGD
 
 
 def sigmoid(x: float) -> float:
@@ -217,7 +219,7 @@ def test_2_layers_mse():
     assert np.all(np.round(W2.gradient, 4) == np.round(dy_hat_W2_torch, 4))
 
 
-def test_xor():
+def test_xor_with_tensors():
     """Tests a basic MLP with two hidden layers and MSE loss
     """
     # (4, 2)
@@ -266,4 +268,33 @@ def test_xor():
 
     assert np.all(test(X) == y.val)
 
-test_xor()
+
+def test_xor_with_layers():
+    X = ad.Tensor(np.array([
+        [0., 0.],
+        [0., 1.],
+        [1., 0.],
+        [1., 1.],
+    ]))
+    y = ad.Tensor(np.array([
+        [1.],
+        [0.],
+        [1.],
+        [0.],
+    ]))
+    model = Model(
+        Linear(2, 100),
+        Sigmoid(),
+        Linear(100, 1),
+        Sigmoid(),
+    )
+
+    optimizer = SGD(params=model.params, lr=0.01)
+    loss_fn = MSE()
+
+    epochs = 500
+    for _ in range(epochs):
+        model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
+
+    y_hat = model(X).val
+    assert np.all(np.round(y_hat) == y.val)
