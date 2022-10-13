@@ -1,8 +1,15 @@
+import math
 import numpy as np
 import torch
+
 import autodiff as ad
-from layers import Linear, MSE, Sigmoid, Model
+import visualization as viz
+from layers import Linear, MSE, Sigmoid, ReLU
+from models import MLP
 from optimizers import SGD
+
+np.random.seed(42)
+np.set_printoptions(suppress=True)
 
 
 def sigmoid(x: float) -> float:
@@ -282,7 +289,7 @@ def test_xor_with_layers():
         [1.],
         [0.],
     ]))
-    model = Model(
+    model = MLP(
         Linear(2, 100),
         Sigmoid(),
         Linear(100, 1),
@@ -292,9 +299,64 @@ def test_xor_with_layers():
     optimizer = SGD(params=model.params, lr=0.01)
     loss_fn = MSE()
 
+    accuracies, losses = [], []
+
     epochs = 500
     for _ in range(epochs):
-        model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
+        loss, y_hat = model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
+        
+        # Measuring accuracy
+        sum = ad.Tensor().sum
+        correct_preds = sum(y_hat.near_eq(y)).val
+        accuracy = correct_preds / y.shape[0]
+        losses.append(loss.val)
+        accuracies.append(accuracy)
 
     y_hat = model(X).val
     assert np.all(np.round(y_hat) == y.val)
+
+    # viz.plot_list(losses, label="Loss")
+    # viz.plot_list(accuracies, label="Accuracy")
+
+
+def test_sin():
+    def generate_sin_data(n: int):
+        dataset = np.empty([n, 2])
+        data = 2 * np.pi * np.random.random_sample((n))
+        dataset[:,0] = data
+        dataset[:,1] = np.sin(data)
+        X = dataset[:,0]
+        y =  dataset[:,1]
+        return X, y
+
+    X, y = generate_sin_data(140)
+    X, y = ad.Tensor(X.reshape(-1, 1)), ad.Tensor(y.reshape(-1, 1))
+
+    model = MLP(
+        Linear(1, 500),
+        ReLU(),
+        Linear(500, 1),
+    )
+
+    optimizer = SGD(params=model.params, lr=0.001)
+    loss_fn = MSE()
+
+    epochs = 10000
+    losses = []
+    for i in range(epochs):
+        optimizer.zero_grad()
+
+        loss, y_hat = model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
+        losses.append(loss)
+
+        sum = ad.Tensor().sum
+        correct_preds = sum(y_hat.near_eq(y)).val
+        accuracy = correct_preds / y.shape[0]
+
+        print(f"Epochs {i}\tloss {loss.val}\taccuracy {accuracy}")
+
+    assert np.all(np.round(y_hat.val) == y.val)
+
+    # viz.plot_list(losses)
+
+test_xor_with_layers()

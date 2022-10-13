@@ -7,6 +7,12 @@ def _sigmoid(x):
 def _sigmoid_derivative(x: float):
     return x * (1 - x)
 
+def _relu(x: float):
+    return np.maximum(0., x)
+
+def _relu_derivative(x: float):
+     return ((x > 0) * np.ones_like(x))
+
 class Tensor:
     ValidInput = Union[float, list, np.ndarray]
 
@@ -61,6 +67,12 @@ class Tensor:
         tensor.tensor_type = "sigmoid"
         return tensor
 
+    def relu(self, input: 'Tensor'):
+        input = input if isinstance(input, Tensor) else Tensor(input)
+        tensor = Tensor(val=_relu(input.val), a=self, b=input)
+        tensor.tensor_type = "relu"
+        return tensor
+
     def mse_loss(self, y_hat: 'Tensor', y: 'Tensor'):
         y_hat = y_hat if isinstance(y_hat, Tensor) else Tensor(y_hat)
         y = y if isinstance(y, Tensor) else Tensor(y)
@@ -70,39 +82,11 @@ class Tensor:
         return val
 
     def __repr__(self) -> str:
-        if self.tensor_type == "var":
-            return f"{self.val}"
-        
-        if self.tensor_type == "add":
-            return f"{self.a} + {self.b}"
-
-        if self.tensor_type == "sub":
-            return f"{self.a} - {self.b}"
-
-        if self.tensor_type == "mul":
-            return f"({self.a} * {self.b})"
-
-        if self.tensor_type == "div":
-            return f"({self.a} / {self.b})"
-
-        if self.tensor_type == "pow":
-            return f"({self.a} ^ {self.b})"
-
-        if self.tensor_type == "matmul":
-            return f"({self.a} . {self.b})"
-
-        if self.tensor_type == "sigmoid":
-            return f"sig({self.b})"
-
-        if self.tensor_type == "mse_loss":
-            return f"mse_loss({self.b})"
-
-        if self.tensor_type == "sum":
-            return f"sum({self.b})"
+        return self.val
 
     def backpropagate(self, gradient=None):
         gradient = gradient if gradient is not None \
-            else np.ones_like(self.val, dtype=np.float64)
+            else np.ones_like(self.val, dtype=np.float32)
         """ y = a
             dy/da = 1
         """
@@ -168,18 +152,43 @@ class Tensor:
         if self.tensor_type == "sigmoid":
             self.b.backpropagate(gradient * _sigmoid_derivative(self.val))
 
-    def _force_np_array(self, val: ValidInput, dtype=np.float64) -> np.ndarray:
+        """ y = relu(a)
+            dy/dA = 0 if a < 0, 1 if a > 0
+        """
+        if self.tensor_type == "relu":
+            self.b.backpropagate(gradient * _relu_derivative(self.val))
+
+
+    def near_eq(self, other: 'Tensor', round: int=2) -> 'Tensor':
+        if self.shape != other.shape:
+            raise ValueError(
+                "Shape should be ({}) to match shape ({}).".format(self.shape, other.shape)
+            )
+        return Tensor(np.equal(np.round(self.val, round), np.round(other.val, round)))
+
+
+    def _force_np_array(self, val: ValidInput, dtype=np.float32) -> np.ndarray:
         if val is None or isinstance(val, Tensor):
             return val
+
+        if isinstance(val, np.ndarray):
+            if val.ndim == 1:
+                # A valid matrix is at least of shape (n, m), not (n,)
+                return val.reshape(-1, 1)
+
         return np.asarray(val, dtype=dtype)
 
     @property
     def shape(self):
         return self.val.shape
 
+class Parameter(Tensor):
     @classmethod
-    def randn(self, *shape):
-        return Tensor(np.random.randn(*shape))
+    def randn(cls, *shape):
+        return cls(np.random.randn(*shape))
+
+    def zero_grad(self):
+        self.gradient = np.zeros(self.shape, dtype=np.float32)
 
         
 if __name__ == '__main__':

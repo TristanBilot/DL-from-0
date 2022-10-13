@@ -1,4 +1,4 @@
-from typing import Union
+from typing import List, Union
 import numpy as np
 
 
@@ -61,7 +61,7 @@ class Tensor:
 
     def backpropagate(self, gradient=None):
         gradient = gradient if gradient is not None \
-            else np.ones_like(self.val, dtype=np.float64)
+            else np.ones_like(self.val, dtype=np.float32)
         """ y = a
             dy/da = 1
         """
