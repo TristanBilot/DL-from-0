@@ -6,7 +6,7 @@ import autodiff as ad
 import visualization as viz
 from layers import Linear, MSE, Sigmoid, ReLU
 from models import MLP
-from optimizers import SGD
+from optimizers import SGD, Adam
 
 np.random.seed(42)
 np.set_printoptions(suppress=True)
@@ -297,6 +297,7 @@ def test_xor_with_layers():
     )
 
     optimizer = SGD(params=model.params, lr=0.01)
+    # optimizer = Adam(params=model.params)
     loss_fn = MSE()
 
     accuracies, losses = [], []
