@@ -1,4 +1,3 @@
-import math
 import numpy as np
 import torch
 
@@ -114,7 +113,7 @@ def test_sum_2():
     mse = (((y_hat_torch - y_torch) ** 2).sum()) / n
     mse.backward()
 
-    dy_hat_w_torch = y_hat_torch.grad.cpu().detach().numpy()
+    dy_hat_w_torch =  np.asarray(y_hat_torch.grad.cpu().detach().numpy(), dtype=np.float32)
 
     assert np.all(y_hat.gradient == dy_hat_w_torch)
 
@@ -138,7 +137,7 @@ def test_mse_1():
     mse = mse_func(y_hat_torch, y)
     mse.backward()
 
-    dy_hat_w_torch = y_hat_torch.grad.cpu().detach().numpy()
+    dy_hat_w_torch = np.asarray(y_hat_torch.grad.cpu().detach().numpy(), dtype=np.float32)
 
     assert np.all(y_hat.gradient == dy_hat_w_torch)
 
@@ -175,9 +174,9 @@ def test_1_layer_mse():
     loss_torch = mse_func(sig_func(W1_torch @ X_torch + b1_torch), y_torch)
     loss_torch.backward()
 
-    dy_hat_W1_torch = W1_torch.grad.cpu().detach().numpy()
+    dy_hat_W1_torch = np.asarray(W1_torch.grad.cpu().detach().numpy(), dtype=np.float32)
 
-    assert np.all(W1.gradient == dy_hat_W1_torch)
+    assert np.all(np.round(W1.gradient, 5) == np.round(dy_hat_W1_torch, 5))
 
 
 def test_2_layers_mse():
@@ -221,7 +220,7 @@ def test_2_layers_mse():
     loss_torch = mse_func(sig_func(W2_torch @ layer1_torch + b2_torch), y_torch)
     loss_torch.backward()
 
-    dy_hat_W2_torch = W2_torch.grad.cpu().detach().numpy()
+    dy_hat_W2_torch = np.asarray(W2_torch.grad.cpu().detach().numpy(), dtype=np.float32)
 
     assert np.all(np.round(W2.gradient, 4) == np.round(dy_hat_W2_torch, 4))
 
@@ -313,7 +312,7 @@ def test_xor_with_layers():
         losses.append(loss.val)
         accuracies.append(accuracy)
 
-    y_hat = model(X).val
+    y_hat = np.asarray(model(X).val, np .float32)
     assert np.all(np.round(y_hat) == y.val)
 
     # viz.plot_list(losses, label="Loss")
@@ -339,25 +338,28 @@ def test_sin():
         Linear(500, 1),
     )
 
-    optimizer = SGD(params=model.params, lr=0.001)
+    # optimizer = SGD(params=model.params, lr=0.001)
+    optimizer = Adam(params=model.params, lr=0.01)
     loss_fn = MSE()
 
-    epochs = 10000
-    losses = []
+    epochs = 5000
+    losses, accuracies = [], []
     for i in range(epochs):
         optimizer.zero_grad()
 
         loss, y_hat = model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
-        losses.append(loss)
+        losses.append(loss.val)
 
         sum = ad.Tensor().sum
         correct_preds = sum(y_hat.near_eq(y)).val
         accuracy = correct_preds / y.shape[0]
+        accuracies.append(accuracy)
 
-        print(f"Epochs {i}\tloss {loss.val}\taccuracy {accuracy}")
+        if i % 200 == 0:
+            print(accuracy)
 
-    assert np.all(np.round(y_hat.val) == y.val)
 
-    # viz.plot_list(losses)
+    viz.plot_list(losses)
+    viz.plot_list(accuracies)
 
-test_xor_with_layers()
+test_sin()
