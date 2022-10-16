@@ -1,12 +1,7 @@
-import math
 import numpy as np
 import torch
 
 import autodiff as ad
-import visualization as viz
-from layers import Linear, MSE, Sigmoid, ReLU
-from models import MLP
-from optimizers import SGD, Adam
 
 np.random.seed(42)
 np.set_printoptions(suppress=True)
@@ -114,7 +109,7 @@ def test_sum_2():
     mse = (((y_hat_torch - y_torch) ** 2).sum()) / n
     mse.backward()
 
-    dy_hat_w_torch = y_hat_torch.grad.cpu().detach().numpy()
+    dy_hat_w_torch =  np.asarray(y_hat_torch.grad.cpu().detach().numpy(), dtype=np.float32)
 
     assert np.all(y_hat.gradient == dy_hat_w_torch)
 
@@ -138,7 +133,7 @@ def test_mse_1():
     mse = mse_func(y_hat_torch, y)
     mse.backward()
 
-    dy_hat_w_torch = y_hat_torch.grad.cpu().detach().numpy()
+    dy_hat_w_torch = np.asarray(y_hat_torch.grad.cpu().detach().numpy(), dtype=np.float32)
 
     assert np.all(y_hat.gradient == dy_hat_w_torch)
 
@@ -175,9 +170,9 @@ def test_1_layer_mse():
     loss_torch = mse_func(sig_func(W1_torch @ X_torch + b1_torch), y_torch)
     loss_torch.backward()
 
-    dy_hat_W1_torch = W1_torch.grad.cpu().detach().numpy()
+    dy_hat_W1_torch = np.asarray(W1_torch.grad.cpu().detach().numpy(), dtype=np.float32)
 
-    assert np.all(W1.gradient == dy_hat_W1_torch)
+    assert np.all(np.round(W1.gradient, 5) == np.round(dy_hat_W1_torch, 5))
 
 
 def test_2_layers_mse():
@@ -221,6 +216,6 @@ def test_2_layers_mse():
     loss_torch = mse_func(sig_func(W2_torch @ layer1_torch + b2_torch), y_torch)
     loss_torch.backward()
 
-    dy_hat_W2_torch = W2_torch.grad.cpu().detach().numpy()
+    dy_hat_W2_torch = np.asarray(W2_torch.grad.cpu().detach().numpy(), dtype=np.float32)
 
     assert np.all(np.round(W2.gradient, 4) == np.round(dy_hat_W2_torch, 4))
