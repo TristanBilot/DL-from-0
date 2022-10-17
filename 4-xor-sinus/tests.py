@@ -359,7 +359,7 @@ def test_sin():
             print(accuracy)
 
 
-    viz.plot_list(losses)
-    viz.plot_list(accuracies)
+    # viz.plot_list(losses)
+    # viz.plot_list(accuracies)
 
 test_sin()

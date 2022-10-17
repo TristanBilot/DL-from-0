@@ -63,7 +63,7 @@ def plot_sin_layers_loss_acc():
     accuracies_, losses_, test_accuracies_ = [], [], []
 
     for i in range(6):
-        X_train, X_test, y_train, y_test = generate_sin_dataset(200)
+        X_train, X_test, y_train, y_test = generate_sin_dataset(200, train_test=0.5)
 
         model = MLP(
             Linear(1, 500),

@@ -144,7 +144,7 @@ class Tensor:
             dy/dA = np.ones_like(A)
         """
         if self.tensor_type == "sum":
-            self.b.backpropagate(gradient * np.ones_like(self.val))
+            self.b.backpropagate(gradient * np.ones_like(self.b.val))
 
         """ y = sigmoid(a)
             dy/dA = sigmoid(a) * (1 - sigmoid(a))

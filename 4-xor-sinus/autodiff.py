@@ -1,4 +1,4 @@
-from typing import Union
+from typing import List, Union
 import numpy as np
 
 def _sigmoid(x):
@@ -83,6 +83,38 @@ class Tensor:
 
     def __repr__(self) -> str:
         return self.val
+        if self.tensor_type == "var":
+            return f"{self.val}"
+        
+        if self.tensor_type == "add":
+            return f"{self.a} + {self.b}"
+
+        if self.tensor_type == "sub":
+            return f"{self.a} - {self.b}"
+
+        if self.tensor_type == "mul":
+            return f"({self.a} * {self.b})"
+
+        if self.tensor_type == "div":
+            return f"({self.a} / {self.b})"
+
+        if self.tensor_type == "pow":
+            return f"({self.a} ^ {self.b})"
+
+        if self.tensor_type == "matmul":
+            return f"({self.a} . {self.b})"
+
+        if self.tensor_type == "sigmoid":
+            return f"sig({self.b})"
+
+        if self.tensor_type == "mse_loss":
+            return f"mse_loss({self.b})"
+
+        if self.tensor_type == "relu":
+            return f"relu({self.b})"
+
+        if self.tensor_type == "sum":
+            return f"sum({self.b})"
 
     def backpropagate(self, gradient=None):
         gradient = gradient if gradient is not None \
@@ -91,7 +123,7 @@ class Tensor:
             dy/da = 1
         """
         if self.tensor_type == "var":
-            self.gradient = self.gradient + gradient
+            self.gradient = self._unbroadcast_addition(self.gradient, gradient)
         
         """ y = a + b
             dy/da = 1
@@ -144,7 +176,7 @@ class Tensor:
             dy/dA = np.ones_like(A)
         """
         if self.tensor_type == "sum":
-            self.b.backpropagate(gradient * np.ones_like(self.val))
+            self.b.backpropagate(gradient * np.ones_like(self.b.val))
 
         """ y = sigmoid(a)
             dy/dA = sigmoid(a) * (1 - sigmoid(a))
@@ -171,12 +203,24 @@ class Tensor:
         if val is None or isinstance(val, Tensor):
             return val
 
-        if isinstance(val, np.ndarray):
-            if val.ndim == 1:
-                # A valid matrix is at least of shape (n, m), not (n,)
-                return val.reshape(-1, 1)
+        # if isinstance(val, np.ndarray):
+        #     if val.ndim == 1:
+        #         # A valid matrix is at least of shape (n, m), not (n,)
+        #         val = val.reshape(-1, 1)
 
         return np.asarray(val, dtype=dtype)
+
+    def _unbroadcast_addition(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        if (type(a) == int or type(b) == int) or (a.ndim == 0 or b.ndim == 0):
+            return a + b
+
+        longest = a if len(a.shape) >= len(b.shape) else b
+        shortest = a if len(a.shape) < len(b.shape) else b
+
+        additional_axis = [i for i, s in enumerate(shortest.shape) if s != longest.shape[i]]
+        for axis in additional_axis:
+            shortest = shortest.sum(axis=axis, keepdims=True)
+        return longest + shortest
 
     @property
     def shape(self):

@@ -13,14 +13,14 @@ def generate_sin_data(n: int):
     return X, y
 
 
-def generate_sin_dataset(n: int):
+def generate_sin_dataset(n: int, train_test: float=0.7):
     X, y = generate_sin_data(n)
     X_train, X_test = \
-        ad.Tensor(X[:int(len(X) * 0.5)].reshape(-1, 1)), \
-        ad.Tensor(X[int(len(X) * 0.5):].reshape(-1, 1))
+        ad.Tensor(X[:int(len(X) * train_test)].reshape(-1, 1)), \
+        ad.Tensor(X[int(len(X) * train_test):].reshape(-1, 1))
     y_train, y_test = \
-        ad.Tensor(y[:int(len(y) * 0.5)].reshape(-1, 1)), \
-        ad.Tensor(y[int(len(y) * 0.5):].reshape(-1, 1))
+        ad.Tensor(y[:int(len(y) * train_test)].reshape(-1, 1)), \
+        ad.Tensor(y[int(len(y) * train_test):].reshape(-1, 1))
     
     return X_train, X_test, y_train, y_test
 
