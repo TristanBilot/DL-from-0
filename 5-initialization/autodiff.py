@@ -198,6 +198,20 @@ class Tensor:
             )
         return Tensor(np.equal(np.round(self.val, round), np.round(other.val, round)))
 
+    def uniform_(self, low: float = 0., high: float = 1.) -> None:
+        """
+        Fill the tensor with values drawn from the uniform distribution.
+
+        Parameters
+        ----------
+        low : float, optional, default=0.
+            The lower bound of the uniform distribution
+
+        high : float, optional, default=1.
+            The upper bound of the uniform distribution
+        """
+        self.val = np.random.uniform(low=low, high=high, size=self.shape)
+
 
     def _force_np_array(self, val: ValidInput, dtype=np.float32) -> np.ndarray:
         if val is None or isinstance(val, Tensor):
@@ -210,44 +224,36 @@ class Tensor:
 
         return np.asarray(val, dtype=dtype)
 
-    def can_be_broadcast(*args):
-        try:
-            np.broadcast(*args)
-            return True
-        except ValueError:
-            return False
-
     def _unbroadcast_addition(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
-        # if (type(a) == int or type(b) == int) or self.can_be_broadcast(a, b) :
-        #     return a + b
-        unmatched_axis = [i for i, s in enumerate(b.shape) if s != a.shape[i]]
-        for axis in unmatched_axis:
-            b = b.sum(axis=axis, keepdims=True)
-        return a + b
+        if (type(a) == int or type(b) == int) or (a.ndim == 0 or b.ndim == 0):
+            return a + b
 
-    # def _unbroadcast_addition(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    #     # if (type(a) == int or type(b) == int) or self.can_be_broadcast(a, b) :
-    #     #     return a + b
-    #         # le probleme vient du or (a.shape[-1] == b.shape[-1] and a.ndim == b.ndim):, il fautn essayer de trouver la bonne condituon 
-    #         # pour que xor et sine marchent
+        longest = a if len(a.shape) >= len(b.shape) else b
+        shortest = a if len(a.shape) < len(b.shape) else b
 
-    #     longest = a if len(a.shape) >= len(b.shape) else b
-    #     shortest = a if len(a.shape) < len(b.shape) else b
-
-    #     additional_axis = [i for i, s in enumerate(shortest.shape) if s != longest.shape[i]]
-    #     for axis in additional_axis:
-    #         shortest = shortest.sum(axis=axis, keepdims=True)
-    #     return longest + shortest
+        additional_axis = [i for i, s in enumerate(shortest.shape) if s != longest.shape[i]]
+        for axis in additional_axis:
+            shortest = shortest.sum(axis=axis, keepdims=True)
+        return longest + shortest
 
     @property
     def shape(self):
         return self.val.shape
+
+    @property
+    def ndim(self):
+        return self.val.ndim
+
 
 class Parameter(Tensor):
     @classmethod
     def randn(cls, *shape):
         return cls(np.random.randn(*shape))
 
+    @classmethod
+    def zeros(cls, *shape, **kwargs):
+        return cls(np.zeros(shape, dtype=np.float32), **kwargs)
+    
     def zero_grad(self):
         self.gradient = np.zeros(self.shape, dtype=np.float32)
 

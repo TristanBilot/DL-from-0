@@ -32,9 +32,9 @@ def plot_xor_layers_loss_acc():
             Sigmoid(),
         )
 
-        lr=0.01 - i *0.002
+        lr=0.001 - i *0.002
         # optimizer = SGD(params=model.params, lr=lr)
-        optimizer = Adam(params=model.params, lr=0.01 - i *0.002)
+        optimizer = Adam(params=model.params, lr=lr)
         loss_fn = MSE()
 
         accuracies, losses = [], []
@@ -45,7 +45,7 @@ def plot_xor_layers_loss_acc():
             
             # Measuring accuracy
             sum = ad.Tensor().sum
-            correct_preds = sum(y_hat.near_eq(y)).val
+            correct_preds = sum(y_hat.near_eq(y, 0)).val
             accuracy = correct_preds / y.shape[0]
             losses.append(loss.val)
             accuracies.append(accuracy)
@@ -63,7 +63,7 @@ def plot_sin_layers_loss_acc():
     accuracies_, losses_, test_accuracies_ = [], [], []
 
     for i in range(6):
-        X_train, X_test, y_train, y_test = generate_sin_dataset(400, train_test=0.8)
+        X_train, X_test, y_train, y_test = generate_sin_dataset(200)
 
         model = MLP(
             Linear(1, 500),
@@ -71,7 +71,7 @@ def plot_sin_layers_loss_acc():
             Linear(500, 1),
         )
 
-        lr=0.0016 - i * 0.00002
+        lr=0.0008 - i * 0.00002
         optimizer = Adam(params=model.params, lr=lr)
         loss_fn = MSE()
 
@@ -112,7 +112,7 @@ def plot_sin_layers_loss_acc():
             test_accuracies.append(test_acc)
 
             if i % 200 == 0:
-                print(test_acc, accuracy, loss.val)
+                print(test_acc, accuracy)
 
         # plot(model)
         accuracies_.append((accuracies, f'lr={round(lr, 5)}'))
@@ -124,4 +124,3 @@ def plot_sin_layers_loss_acc():
     viz.plot_lists(test_accuracies_)
 
 plot_xor_layers_loss_acc()
-# plot_sin_layers_loss_acc()
