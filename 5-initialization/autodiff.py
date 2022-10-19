@@ -44,6 +44,7 @@ class Tensor:
         return tensor
 
     def __mul__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         tensor = Tensor(val=self.val * other.val, a=self, b=other)
         tensor.tensor_type = "mul"
         return tensor
@@ -69,6 +70,13 @@ class Tensor:
         tensor = Tensor(val=-self.val, a=self, b=self)
         tensor.tensor_type = "neg"
         return tensor
+
+    def __radd__(self, other): return self + other
+    def __rsub__(self, other): return self - other
+    def __rmul__(self, other): return self * other
+    def __rtruediv__(self, other): return self / other
+    def __rpow__(self, other): return self ** other
+    def __rmatmul__(self, other): return self @ other
 
     def sum(self, input: 'Tensor', axis: int=None, keepdims: bool=False):
         input = input if isinstance(input, Tensor) else Tensor(input)
@@ -97,6 +105,12 @@ class Tensor:
         return val
 
     def softmax(self, input: 'Tensor', dim: int=-1) -> 'Tensor':
+        """TODO Should be replaced by stable softmax
+        https://deepnotes.io/softmax-crossentropy
+        def stable_softmax(X):
+            exps = np.exp(X - np.max(X))
+            return exps / np.sum(exps)
+        """
         input = input if isinstance(input, Tensor) else Tensor(input)
         exp = self.exp(input)
         out = exp / self.sum(exp, axis=dim, keepdims=True)
@@ -114,47 +128,48 @@ class Tensor:
         tensor.tensor_type = "ln"
         return tensor
 
-    def reduce_sum(self, input: 'Tensor', axis = None, keepdims=False) -> 'Tensor':
-        input = input if isinstance(input, Tensor) else Tensor(input)
-        tensor = Tensor(np.sum(input.value, axis=axis, keepdims=keepdims))
-        tensor.tensor_type = "reduce_sum"
-        return tensor
-
     def nll_loss(
         self,
-        input: 'Tensor',
-        target: 'Tensor',
+        y_hat: 'Tensor',
+        y: 'Tensor',
         reduction: str = 'mean'
     ) -> 'Tensor':
 
-        if input.ndim != 2:
+        if y_hat.ndim != 2:
             raise ValueError("Expected 2 dimensions, (batch_size, nb_classes)")
-        if target.ndim != 1:
+        if y.ndim != 1:
             raise ValueError(
-                "Parameter `target` should be a 1D vector of size batch_size where each element is a class"
+                "Parameter `y` should be a 1D vector of size batch_size where each element is a class"
             )
-        if input.shape[0] != target.shape[0]:
+        if y_hat.shape[0] != y.shape[0]:
             raise ValueError(
-                "Expected input batch_size ({}) to match target batch_size ({}).".format(input.shape[0], target.shape[0])
+                "Expected y_hat batch_size ({}) to match y batch_size ({}).".format(y_hat.shape[0], y.shape[0])
             )
 
-        batch_size = input.shape[0]
-        n_classes = input.shape[1]
+        batch_size = y_hat.shape[0]
+        nb_classes = y_hat.shape[1]
         eps = 1e-7
 
-        ret = -np.log(input.val[np.arange(batch_size), target.val.astype(np.int)] + eps)
+        ret = -np.log(y_hat.val[np.arange(batch_size), y.val.astype(np.int)] + eps)
         if reduction in ['sum', 'mean']:
             ret = np.sum(ret)
         if reduction == 'mean':
             ret = ret / batch_size
 
-        tensor = Tensor(val=ret, a=self, b=input)
+        tensor = Tensor(val=ret, a=self, b=y_hat)
         tensor.tensor_type = "nll_loss"
-        tensor.target = target
+        tensor.y = y
         tensor.reduction = reduction
-        tensor.n_classes = n_classes
+        tensor.nb_classes = nb_classes
         tensor.batch_size = batch_size
         return tensor
+
+    def crossentropy_loss(self, y_hat: 'Tensor', y: 'Tensor', axis: int=None, keepdims: bool=False):
+        y_hat = y_hat if isinstance(y_hat, Tensor) else Tensor(y_hat)
+        batch_size = Tensor(y_hat.shape[0])
+        val = Tensor(-1) * self.sum(y * self.ln(y_hat), axis=axis, keepdims=keepdims)
+        val = val / batch_size
+        return val
 
     def argmax(self, input: 'Tensor', dim: int=None) -> 'Tensor':
         tensor = Tensor(val=np.argmax(input.val, axis=dim), a=None, b=None)
@@ -190,8 +205,10 @@ class Tensor:
             dy/db = a
         """
         if self.tensor_type == "mul":
-            self.a.backpropagate(self._unbroadcast(gradient * self.b, self.a.shape))
-            self.b.backpropagate(self._unbroadcast(gradient * self.a, self.b.val.shape))
+            self_b = self.b.val if isinstance(self.b, Tensor) else self.b
+            self_a = self.a.val if isinstance(self.a, Tensor) else self.a
+            self.a.backpropagate(self._unbroadcast(gradient * self_b, self_a.shape))
+            self.b.backpropagate(self._unbroadcast(gradient * self_a, self_b.shape))
 
         """ y = a / b
             dy/da = 1 / b
@@ -251,19 +268,17 @@ class Tensor:
             dy/da = 1 / a
         """
         if self.tensor_type == "ln":
-            self.b.backpropagate(gradient * 1 / self.b.val)
+            self_b = self.b.val if isinstance(self.b, Tensor) else self.b
+            self.b.backpropagate(gradient / self_b)
 
         if self.tensor_type == "nll_loss":
             p = np.clip(self.b.val, 1e-15, 1 - 1e-15)
-            y = _one_hot_encode(self.target.val, n_classes=self.n_classes)
+            y = _one_hot_encode(self.y.val, nb_classes=self.nb_classes)
             
             if self.reduction == 'mean':
                 self.b.backpropagate((p - y) / self.batch_size)
             elif self.reduction == 'sum':
                 self.b.backpropagate(p - y)
-
-        if self.tensor_type == "reduce_sum":
-            self.b.backpropagate(gradient * np.ones(self.b.val.shape))
 
 
     def near_eq(self, other: 'Tensor', round: int=2) -> 'Tensor':

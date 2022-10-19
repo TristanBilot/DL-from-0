@@ -51,7 +51,12 @@ class MSE(Layer):
 class NllLoss(Layer):
     def __call__(self, y_hat: Tensor, y: Tensor):
         loss_fn = Tensor().nll_loss
-        return loss_fn(input=y_hat, target=y)
+        return loss_fn(y_hat=y_hat, y=y)
+
+class CrossEntropyLoss(Layer):
+    def __call__(self, y_hat: Tensor, y: Tensor):
+        loss_fn = Tensor().crossentropy_loss
+        return loss_fn(y_hat=y_hat, y=y)
 
 
 class Argmax(Layer):
