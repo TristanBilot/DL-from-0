@@ -27,16 +27,16 @@ def to_categorical(target: np.ndarray, n_classes: int = None) -> np.ndarray:
 	one_hot[np.arange(batch_size), target] = 1
 	return one_hot
 
-def _sigmoid(x):
+def _sigmoid(x: np.ndarray):
     return 1 / (1 + np.exp(-x))
 
-def _sigmoid_derivative(x: float):
+def _sigmoid_derivative(x: np.ndarray):
     return x * (1 - x)
 
-def _relu(x: float):
+def _relu(x: np.ndarray):
     return np.maximum(0., x)
 
-def _relu_derivative(x: float):
+def _relu_derivative(x: np.ndarray):
      return ((x > 0) * np.ones_like(x))
 
 class Tensor:
