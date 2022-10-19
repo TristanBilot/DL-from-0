@@ -65,6 +65,11 @@ class Tensor:
         tensor.tensor_type = "matmul"
         return tensor
 
+    def __neg__(self) :
+        tensor = Tensor(val=-self.val, a=self, b=self)
+        tensor.tensor_type = "neg"
+        return tensor
+
     def sum(self, input: 'Tensor', axis: int=None, keepdims: bool=False):
         input = input if isinstance(input, Tensor) else Tensor(input)
         tensor = Tensor(val=np.sum(input.val, axis=axis, keepdims=keepdims), a=self, b=input)
@@ -103,7 +108,13 @@ class Tensor:
         tensor.tensor_type = "exp"
         return tensor
 
-    def reduce_sum(self, input: 'Tensor', axis = None, keepdims=False):
+    def ln(self, input: 'Tensor') -> 'Tensor':
+        input = input if isinstance(input, Tensor) else Tensor(input)
+        tensor = Tensor(val=np.log(input.val), a=self, b=input)
+        tensor.tensor_type = "ln"
+        return tensor
+
+    def reduce_sum(self, input: 'Tensor', axis = None, keepdims=False) -> 'Tensor':
         input = input if isinstance(input, Tensor) else Tensor(input)
         tensor = Tensor(np.sum(input.value, axis=axis, keepdims=keepdims))
         tensor.tensor_type = "reduce_sum"
@@ -205,6 +216,12 @@ class Tensor:
             self.a.backpropagate(np.dot(gradient, self.b.val.T))
             self.b.backpropagate(np.dot(self.a.val.T, gradient))
 
+        """ y = -a
+            dy/da = -1
+        """
+        if self.tensor_type == "neg":
+            self.b.backpropagate(-gradient)
+
         """ y = sum(A)
             dy/dA = np.ones_like(A)
         """
@@ -230,6 +247,12 @@ class Tensor:
             # should be gradient * self.val but gradient * self.b.val gives better accuracy (?)
             self.b.backpropagate(gradient * self.val)
 
+        """ y = ln(a)
+            dy/da = 1 / a
+        """
+        if self.tensor_type == "ln":
+            self.b.backpropagate(gradient * 1 / self.b.val)
+
         if self.tensor_type == "nll_loss":
             p = np.clip(self.b.val, 1e-15, 1 - 1e-15)
             y = _one_hot_encode(self.target.val, n_classes=self.n_classes)
@@ -240,7 +263,7 @@ class Tensor:
                 self.b.backpropagate(p - y)
 
         if self.tensor_type == "reduce_sum":
-            self.b.backpropagate(np.ones(self.b.val.shape))
+            self.b.backpropagate(gradient * np.ones(self.b.val.shape))
 
 
     def near_eq(self, other: 'Tensor', round: int=2) -> 'Tensor':
