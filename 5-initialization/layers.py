@@ -48,6 +48,18 @@ class MSE(Layer):
         return loss_fn(y_hat=y_hat, y=y)
 
 
+class NllLoss(Layer):
+    def __call__(self, y_hat: Tensor, y: Tensor):
+        loss_fn = Tensor().nll_loss
+        return loss_fn(input=y_hat, target=y)
+
+
+class Argmax(Layer):
+    def __call__(self, input: 'Tensor', dim: int=None):
+        fn = Tensor().argmax
+        return fn(input=input, dim=dim)
+
+
 class Sigmoid(Layer):
     def __call__(self, X: Tensor):
         sig = Tensor().sigmoid

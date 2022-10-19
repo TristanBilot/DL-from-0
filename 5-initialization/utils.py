@@ -45,3 +45,16 @@ def shuffle_dataset(
     y_train, y_test = ad.Tensor(y_train), ad.Tensor(y_test)
 
     return X_train, X_test, y_train, y_test
+
+
+def divide_train_test(
+    X: np.ndarray,
+    y: np.ndarray,
+    train_test: float,
+):
+    X_train = ad.Tensor(X[:int(len(X)*train_test)])
+    y_train = ad.Tensor(y[:int(len(X)*train_test)])
+    X_test = ad.Tensor(X[int(len(X)*train_test):])
+    y_test = ad.Tensor(y[int(len(X)*train_test):])
+    
+    return X_train, X_test, y_train, y_test
