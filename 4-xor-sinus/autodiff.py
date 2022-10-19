@@ -24,6 +24,7 @@ class Tensor:
         self.tensor_type = "var"
 
     def __add__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         tensor = Tensor(val=self.val + other.val, a=self, b=other)
         tensor.tensor_type = "add"
         return tensor
@@ -34,6 +35,7 @@ class Tensor:
         return tensor
 
     def __mul__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         tensor = Tensor(val=self.val * other.val, a=self, b=other)
         tensor.tensor_type = "mul"
         return tensor
@@ -81,41 +83,6 @@ class Tensor:
         val = (sum((y_hat - y) ** Tensor(2))) / n
         return val
 
-    def __repr__(self) -> str:
-        return self.val
-        if self.tensor_type == "var":
-            return f"{self.val}"
-        
-        if self.tensor_type == "add":
-            return f"{self.a} + {self.b}"
-
-        if self.tensor_type == "sub":
-            return f"{self.a} - {self.b}"
-
-        if self.tensor_type == "mul":
-            return f"({self.a} * {self.b})"
-
-        if self.tensor_type == "div":
-            return f"({self.a} / {self.b})"
-
-        if self.tensor_type == "pow":
-            return f"({self.a} ^ {self.b})"
-
-        if self.tensor_type == "matmul":
-            return f"({self.a} . {self.b})"
-
-        if self.tensor_type == "sigmoid":
-            return f"sig({self.b})"
-
-        if self.tensor_type == "mse_loss":
-            return f"mse_loss({self.b})"
-
-        if self.tensor_type == "relu":
-            return f"relu({self.b})"
-
-        if self.tensor_type == "sum":
-            return f"sum({self.b})"
-
     def backpropagate(self, gradient=None):
         gradient = gradient if gradient is not None \
             else np.ones_like(self.val, dtype=np.float32)
@@ -123,39 +90,39 @@ class Tensor:
             dy/da = 1
         """
         if self.tensor_type == "var":
-            self.gradient = self._unbroadcast_addition(self.gradient, gradient)
+            self.gradient = self.gradient + gradient
         
         """ y = a + b
             dy/da = 1
             dy/db = 1
         """
         if self.tensor_type == "add":
-            self.a.backpropagate(gradient)
-            self.b.backpropagate(gradient)
+            self.a.backpropagate(self._unbroadcast(gradient, self.a.shape))
+            self.b.backpropagate(self._unbroadcast(gradient, self.b.shape))
 
         """ y = a - b
             dy/da = 1
             dy/db = -1
         """
         if self.tensor_type == "sub":
-            self.a.backpropagate(gradient)
-            self.b.backpropagate(-gradient)
+            self.a.backpropagate(self._unbroadcast(gradient, self.a.shape))
+            self.b.backpropagate(self._unbroadcast(-gradient, self.b.shape))
 
         """ y = a * b
             dy/da = b
             dy/db = a
         """
         if self.tensor_type == "mul":
-            self.a.backpropagate(gradient * self.b.val)
-            self.b.backpropagate(gradient * self.a.val)
+            self.a.backpropagate(self._unbroadcast(gradient * self.b, self.a.shape))
+            self.b.backpropagate(self._unbroadcast(gradient * self.a, self.b.val.shape))
 
         """ y = a / b
             dy/da = 1 / b
             dy/db = -a / b ** 2
         """
         if self.tensor_type == "div":
-            self.a.backpropagate(gradient * 1 / self.b.val)
-            self.b.backpropagate(gradient * -self.a.val / self.b.val ** 2)
+            self.a.backpropagate(self._unbroadcast(gradient * 1 / self.b.val, self.a.shape))
+            self.b.backpropagate(self._unbroadcast(gradient * -self.a.val / self.b.val ** 2, self.b.shape))
 
         """ y = a ** b
             dy/da = b * a ** b-1
@@ -188,7 +155,7 @@ class Tensor:
             dy/dA = 0 if a < 0, 1 if a > 0
         """
         if self.tensor_type == "relu":
-            self.b.backpropagate(gradient * _relu_derivative(self.val))
+            self.b.backpropagate(gradient * _relu_derivative(self.b.val))
 
 
     def near_eq(self, other: 'Tensor', round: int=2) -> 'Tensor':
@@ -210,34 +177,18 @@ class Tensor:
 
         return np.asarray(val, dtype=dtype)
 
-    def can_be_broadcast(*args):
-        try:
-            np.broadcast(*args)
-            return True
-        except ValueError:
-            return False
-
-    def _unbroadcast_addition(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
-        # if (type(a) == int or type(b) == int) or self.can_be_broadcast(a, b) :
-        #     return a + b
-        unmatched_axis = [i for i, s in enumerate(b.shape) if s != a.shape[i]]
-        for axis in unmatched_axis:
-            b = b.sum(axis=axis, keepdims=True)
-        return a + b
-
-    # def _unbroadcast_addition(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    #     # if (type(a) == int or type(b) == int) or self.can_be_broadcast(a, b) :
-    #     #     return a + b
-    #         # le probleme vient du or (a.shape[-1] == b.shape[-1] and a.ndim == b.ndim):, il fautn essayer de trouver la bonne condituon 
-    #         # pour que xor et sine marchent
-
-    #     longest = a if len(a.shape) >= len(b.shape) else b
-    #     shortest = a if len(a.shape) < len(b.shape) else b
-
-    #     additional_axis = [i for i, s in enumerate(shortest.shape) if s != longest.shape[i]]
-    #     for axis in additional_axis:
-    #         shortest = shortest.sum(axis=axis, keepdims=True)
-    #     return longest + shortest
+    def _unbroadcast(self, x: np.ndarray, shape) -> np.ndarray:
+        x = np.float32(x)
+        extra_dims = x.ndim - len(shape)
+        assert extra_dims >= 0
+        dim = [i for i in range(x.ndim) if x.shape[i] > 1 and (i < extra_dims or shape[i - extra_dims] == 1)]
+        if len(dim) != 0:
+            dim = dim[0]
+            x = x.sum(axis=dim, keepdims=True)
+        if extra_dims:
+            x = x.reshape(-1, *x.shape[extra_dims+1:])
+        assert x.shape == shape
+        return x
 
     @property
     def shape(self):
@@ -247,6 +198,10 @@ class Parameter(Tensor):
     @classmethod
     def randn(cls, *shape):
         return cls(np.random.randn(*shape))
+
+    @classmethod
+    def zeros(cls, *shape, **kwargs):
+        return cls(np.zeros(shape, dtype=np.float32), **kwargs)
 
     def zero_grad(self):
         self.gradient = np.zeros(self.shape, dtype=np.float32)

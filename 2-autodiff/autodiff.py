@@ -27,12 +27,13 @@ class Tensor:
         tensor.tensor_type = "mul"
         return tensor
 
-    def __div__(self, other):
+    def __truediv__(self, other):
         tensor = Tensor(val=self.val / other.val, a=self, b=other)
         tensor.tensor_type = "div"
         return tensor
 
     def __pow__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         tensor = Tensor(val=self.val ** other.val, a=self, b=other)
         tensor.tensor_type = "pow"
         return tensor
@@ -73,32 +74,32 @@ class Tensor:
             dy/db = 1
         """
         if self.tensor_type == "add":
-            self.a.backpropagate(gradient)
-            self.b.backpropagate(gradient)
+            self.a.backpropagate(self._unbroadcast(gradient, self.a.shape))
+            self.b.backpropagate(self._unbroadcast(gradient, self.b.shape))
 
         """ y = a - b
             dy/da = 1
             dy/db = -1
         """
         if self.tensor_type == "sub":
-            self.a.backpropagate(gradient)
-            self.b.backpropagate(-gradient)
+            self.a.backpropagate(self._unbroadcast(gradient, self.a.shape))
+            self.b.backpropagate(self._unbroadcast(-gradient, self.b.shape))
 
         """ y = a * b
             dy/da = b
             dy/db = a
         """
         if self.tensor_type == "mul":
-            self.a.backpropagate(gradient * self.b.val)
-            self.b.backpropagate(gradient * self.a.val)
+            self.a.backpropagate(self._unbroadcast(gradient * self.b, self.a.shape))
+            self.b.backpropagate(self._unbroadcast(gradient * self.a, self.b.val.shape))
 
         """ y = a / b
             dy/da = 1 / b
             dy/db = -a / b ** 2
         """
         if self.tensor_type == "div":
-            self.a.backpropagate(gradient * 1 / self.b.val)
-            self.b.backpropagate(gradient * -self.a.val / self.b.val ** 2)
+            self.a.backpropagate(self._unbroadcast(gradient * 1 / self.b.val, self.a.shape))
+            self.b.backpropagate(self._unbroadcast(gradient * -self.a.val / self.b.val ** 2, self.b.shape))
 
         """ y = a ** b
             dy/da = b * a ** b-1
@@ -122,4 +123,22 @@ class Tensor:
             def _sigmoid_derivative(x: float):
                 return x * (1 - x)
             self.b.backpropagate(gradient * _sigmoid_derivative(self.val))
-            self.b.backpropagate(gradient * _sigmoid_derivative(self.val))
+
+
+    # inspired from https://github.com/connor11son/stylegan-fmri/blob/66ccccbe081391bfd094ad94f5d9d9903115a1a8/torch_utils/ops/fma.py
+    def _unbroadcast(self, x: np.ndarray, shape) -> np.ndarray:
+        x = np.float32(x)
+        extra_dims = x.ndim - len(shape)
+        assert extra_dims >= 0
+        dim = [i for i in range(x.ndim) if x.shape[i] > 1 and (i < extra_dims or shape[i - extra_dims] == 1)]
+        if len(dim) != 0:
+            dim = dim[0]
+            x = x.sum(axis=dim, keepdims=True)
+        if extra_dims:
+            x = x.reshape(-1, *x.shape[extra_dims+1:])
+        assert x.shape == shape
+        return x
+
+    @property
+    def shape(self):
+        return self.val.shape

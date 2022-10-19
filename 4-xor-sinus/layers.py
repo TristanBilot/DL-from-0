@@ -16,7 +16,7 @@ class WeightedLayer(Layer):
 class Linear(WeightedLayer):
     def __init__(self, nb_inp: int, nb_out: int) -> None:
         self.weight = Parameter.randn(nb_inp, nb_out)
-        self.bias = Parameter.randn(1, nb_out)
+        self.bias = Parameter.zeros(1, nb_out)
         self.params = [self.weight, self.bias]
 
     def __call__(self, X: Tensor):

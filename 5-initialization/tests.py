@@ -303,7 +303,7 @@ def test_xor_with_layers():
 
     accuracies, losses = [], []
 
-    epochs = 1000
+    epochs = 700
     for _ in range(epochs):
         loss, y_hat = model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
         
@@ -376,7 +376,3 @@ def test_mlp_mutiple_input_sizes():
     res = model(B)
     res = MSE()(res, ad.Tensor(np.zeros_like(res)))
     res.backpropagate()
-
-
-test_xor_with_layers()
-# test_sin()

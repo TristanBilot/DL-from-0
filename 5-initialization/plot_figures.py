@@ -32,14 +32,14 @@ def plot_xor_layers_loss_acc():
             Sigmoid(),
         )
 
-        lr=0.001 - i *0.002
-        # optimizer = SGD(params=model.params, lr=lr)
-        optimizer = Adam(params=model.params, lr=lr)
+        lr=0.001 - i *0.0002
+        optimizer = SGD(params=model.params, lr=lr)
+        # optimizer = Adam(params=model.params, lr=lr)
         loss_fn = MSE()
 
         accuracies, losses = [], []
 
-        epochs = 300
+        epochs = 1000
         for _ in range(epochs):
             loss, y_hat = model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
             
@@ -71,7 +71,7 @@ def plot_sin_layers_loss_acc():
             Linear(500, 1),
         )
 
-        lr=0.0008 - i * 0.00002
+        lr=0.00008 - i * 0.000002
         optimizer = Adam(params=model.params, lr=lr)
         loss_fn = MSE()
 
@@ -123,4 +123,5 @@ def plot_sin_layers_loss_acc():
     viz.plot_lists(accuracies_)
     viz.plot_lists(test_accuracies_)
 
-plot_xor_layers_loss_acc()
+# plot_xor_layers_loss_acc()
+plot_sin_layers_loss_acc()
