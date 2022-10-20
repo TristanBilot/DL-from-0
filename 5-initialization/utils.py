@@ -41,8 +41,8 @@ def shuffle_dataset(
     X_test = X_test.val[indices]
     y_test = y_test.val[indices]
 
-    X_train, X_test = ad.Tensor(X_train), ad.Tensor(X_test)
-    y_train, y_test = ad.Tensor(y_train), ad.Tensor(y_test)
+    X_train, X_test = ad.Tensor(X_train, dtype=X_train.dtype), ad.Tensor(X_train, dtype=X_test.dtype)
+    y_train, y_test = ad.Tensor(y_train, dtype=y_train.dtype), ad.Tensor(y_train, dtype=y_test.dtype)
 
     return X_train, X_test, y_train, y_test
 
@@ -51,10 +51,12 @@ def divide_train_test(
     X: np.ndarray,
     y: np.ndarray,
     train_test: float,
+    dtype_X=np.float32,
+    dtype_y=np.float32,
 ):
-    X_train = ad.Tensor(X[:int(len(X)*train_test)])
-    y_train = ad.Tensor(y[:int(len(X)*train_test)])
-    X_test = ad.Tensor(X[int(len(X)*train_test):])
-    y_test = ad.Tensor(y[int(len(X)*train_test):])
+    X_train = ad.Tensor(X[:int(len(X)*train_test)], dtype=dtype_X)
+    X_test = ad.Tensor(X[int(len(X)*train_test):], dtype=dtype_X)
+    y_train = ad.Tensor(y[:int(len(X)*train_test)], dtype=dtype_y)
+    y_test = ad.Tensor(y[int(len(X)*train_test):], dtype=dtype_y)
     
     return X_train, X_test, y_train, y_test

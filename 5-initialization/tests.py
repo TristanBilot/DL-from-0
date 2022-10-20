@@ -4,7 +4,7 @@ import torch
 
 import autodiff as ad
 import visualization as viz
-from layers import Linear, MSE, Sigmoid, ReLU
+from layers import Linear, MSE, Sigmoid, ReLU, NllLoss, Softmax, CrossEntropyLoss
 from models import MLP
 from optimizers import SGD, Adam
 from utils import generate_sin_dataset, shuffle_dataset
@@ -376,3 +376,72 @@ def test_mlp_mutiple_input_sizes():
     res = model(B)
     res = MSE()(res, ad.Tensor(np.zeros_like(res)))
     res.backpropagate()
+
+
+def mock_torch_dataset(inp: int, out: int, batch_size: int):
+    X = np.random.randn(batch_size, inp)
+    y = np.random.randint(0, out, (batch_size,))
+    return ad.Tensor(X), ad.Tensor(y, dtype=np.int32), torch.tensor(X), torch.tensor(y)
+
+
+def train_torch(
+    model,
+    X: torch.Tensor,
+    y: torch.Tensor,
+    optimizer,
+    loss_fn,
+):
+    y_hat = model(X.float())
+    loss = loss_fn(y_hat, y)
+    loss.backward()
+    optimizer.step()
+    return loss, y_hat
+
+
+def test_nll():
+    np.random.seed(42)
+    inp, out, batch_size = 64, 10, 32
+    X, y, X_t, y_t = mock_torch_dataset(inp, out, batch_size)
+    lr = 0.001
+
+    # Our
+    model = MLP(
+        Linear(inp, 100),
+        Sigmoid(),
+        Linear(100, out),
+        Softmax()
+    )
+    optimizer = Adam(params=model.params, lr=lr)
+    loss_fn = NllLoss()
+    loss, y_hat = model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
+
+    X2, y2, _, _ = mock_torch_dataset(inp, out, 99)
+    model(X2)
+
+
+def test_depth_1():
+    np.random.seed(42)
+    inp, out, batch_size = 1, 6, 32
+    X, y, X_t, y_t = mock_torch_dataset(inp, out, batch_size)
+    lr = 0.001
+
+    model = MLP(
+        Linear(1, 2),
+        Sigmoid(),
+        Linear(2, 3),
+        Linear(3, 4),
+        Linear(4, 5),
+        Linear(5, 6),
+        ReLU(),
+        Sigmoid(),
+        Softmax()
+    )
+    optimizer = Adam(params=model.params, lr=lr)
+    loss_fn = NllLoss()
+    _, _ = model.train(X=X, y=y, optimizer=optimizer, loss_fn=loss_fn)
+
+    X2, y2, _, _ = mock_torch_dataset(inp, out, 99)
+    model(X2)
+    
+
+test_mlp_mutiple_input_sizes()
