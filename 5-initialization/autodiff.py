@@ -26,19 +26,24 @@ def _relu_derivative(x: np.ndarray):
 class Tensor:
     ValidInput = Union[float, list, np.ndarray]
 
-    def __init__(self, val: ValidInput=None, a=None, b=None) -> None:
-        self.val = self._force_np_array(val)
-        self.a = self._force_np_array(a)
-        self.b = self._force_np_array(b)
+    def __init__(self, val: ValidInput=None, dtype: np.dtype=np.float32, a=None, b=None) -> None:
+        self.val = self._force_np_array(val, dtype=dtype)
+        self.a = a
+        self.b = b
         self.gradient = np.zeros_like(self.val, dtype=np.float32)
         self.tensor_type = "var"
 
+    def __repr__(self):
+        return f"Tensor({self.val})"
+
     def __add__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         tensor = Tensor(val=self.val + other.val, a=self, b=other)
         tensor.tensor_type = "add"
         return tensor
 
     def __sub__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         tensor = Tensor(val=self.val - other.val, a=self, b=other)
         tensor.tensor_type = "sub"
         return tensor
@@ -50,6 +55,7 @@ class Tensor:
         return tensor
 
     def __truediv__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
         tensor = Tensor(val=self.val / other.val, a=self, b=other)
         tensor.tensor_type = "div"
         return tensor
@@ -71,17 +77,21 @@ class Tensor:
         tensor.tensor_type = "neg"
         return tensor
 
-    def __radd__(self, other): return self + other
-    def __rsub__(self, other): return self - other
-    def __rmul__(self, other): return self * other
-    def __rtruediv__(self, other): return self / other
-    def __rpow__(self, other): return self ** other
-    def __rmatmul__(self, other): return self @ other
+    # even for symetric operations like add we need to forward the operation like
+    # this because of the case -6--1=>-5 ; -1--6=>5
+    def __radd__(self, other):      return type(self)(other) + self
+    def __rsub__(self, other):      return type(self)(other) - self
+    def __rmul__(self, other):      return type(self)(other) * self
+    def __rtruediv__(self, other):  return type(self)(other) / self
+    def __rpow__(self, other):      return type(self)(other) ** self
+    def __rmatmul__(self, other):   return type(self)(other) @ self
 
     def sum(self, input: 'Tensor', axis: int=None, keepdims: bool=False):
         input = input if isinstance(input, Tensor) else Tensor(input)
         tensor = Tensor(val=np.sum(input.val, axis=axis, keepdims=keepdims), a=self, b=input)
         tensor.tensor_type = "sum"
+        tensor.axis = axis
+        tensor.keepdims = keepdims
         return tensor
 
     def sigmoid(self, input: 'Tensor'):
@@ -116,6 +126,19 @@ class Tensor:
         out = exp / self.sum(exp, axis=dim, keepdims=True)
         return out
 
+    # def log_softmax(self, input: 'Tensor') -> 'Tensor':
+    #     # mettre forule
+    #     input = input if isinstance(input, Tensor) else Tensor(input)
+    #     val = input - self.unsqueeze(self.ln(self.sum(self.exp(input), axis=-1)), axis=-1)
+    #     return val
+
+    # def unsqueeze(self, input: 'Tensor', axis: int) -> 'Tensor':
+    #     input = input if isinstance(input, Tensor) else Tensor(input)
+    #     tensor = Tensor(val=np.expand_dims(input.val, axis=axis), a=self, b=input)
+    #     tensor.tensor_type = "unsqueeze"
+    #     tensor.axis = axis
+    #     return tensor
+
     def exp(self, input: 'Tensor') -> 'Tensor':
         input = input if isinstance(input, Tensor) else Tensor(input)
         tensor = Tensor(val=np.exp(input.val), a=self, b=input)
@@ -132,7 +155,8 @@ class Tensor:
         self,
         y_hat: 'Tensor',
         y: 'Tensor',
-        reduction: str = 'mean'
+        reduction: str = 'mean',
+        use_log: bool=False,
     ) -> 'Tensor':
 
         if y_hat.ndim != 2:
@@ -150,7 +174,9 @@ class Tensor:
         nb_classes = y_hat.shape[1]
         eps = 1e-7
 
-        ret = -np.log(y_hat.val[np.arange(batch_size), y.val.astype(np.int)] + eps)
+        ret = -y_hat.val[np.arange(batch_size), y.val.astype(np.int)] + eps
+        if use_log:
+            ret = np.log(ret)
         if reduction in ['sum', 'mean']:
             ret = np.sum(ret)
         if reduction == 'mean':
@@ -169,6 +195,10 @@ class Tensor:
         batch_size = Tensor(y_hat.shape[0])
         val = Tensor(-1) * self.sum(y * self.ln(y_hat), axis=axis, keepdims=keepdims)
         val = val / batch_size
+
+        # nll_loss = self.nll_loss
+        # y_hat = self.log_softmax(y_hat)
+        # val = nll_loss(y_hat, y)
         return val
 
     def argmax(self, input: 'Tensor', dim: int=None) -> 'Tensor':
@@ -243,6 +273,12 @@ class Tensor:
             dy/dA = np.ones_like(A)
         """
         if self.tensor_type == "sum":
+            if self.ndim < self.b.ndim:
+                axis = self.ndim if self.axis == -1 else self.axis
+                other_dims = [axis] if type(axis) is int else axis
+                new_shape = [1 if other_dims is None or i in other_dims \
+                    else self.b.shape[i] for i in range(len(self.b.shape))]
+                gradient = gradient.reshape(new_shape)
             self.b.backpropagate(gradient * np.ones_like(self.b.val))
 
         """ y = sigmoid(a)
@@ -256,6 +292,9 @@ class Tensor:
         """
         if self.tensor_type == "relu":
             self.b.backpropagate(gradient * _relu_derivative(self.b.val))
+
+        # if self.tensor_type == "unsqueeze":
+        #     self.b.backpropagate(self._unbroadcast(np.squeeze(self.gradient, axis=self.axis), self.b.shape))
 
         """ y = exp(a)
             dy/da = exp(a)
@@ -313,8 +352,12 @@ class Tensor:
             x = x.sum(axis=dim, keepdims=True)
         if extra_dims:
             x = x.reshape(-1, *x.shape[extra_dims+1:])
-        assert x.shape == shape
+
+        assert x.shape in [(1,), ()] if shape in [(1,), ()] else shape
         return x
+
+    def zero_grad(self):
+        self.gradient = np.zeros(self.shape, dtype=np.float32)
 
     @property
     def shape(self):
@@ -323,6 +366,10 @@ class Tensor:
     @property
     def ndim(self):
         return self.val.ndim
+
+    @property
+    def dtype(self):
+        return self.val.dtype
 
 
 class Parameter(Tensor):
@@ -333,6 +380,3 @@ class Parameter(Tensor):
     @classmethod
     def zeros(cls, *shape, **kwargs):
         return cls(np.zeros(shape, dtype=np.float32), **kwargs)
-    
-    def zero_grad(self):
-        self.gradient = np.zeros(self.shape, dtype=np.float32)

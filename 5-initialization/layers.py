@@ -49,9 +49,9 @@ class MSE(Layer):
 
 
 class NllLoss(Layer):
-    def __call__(self, y_hat: Tensor, y: Tensor):
+    def __call__(self, y_hat: Tensor, y: Tensor, **kwargs):
         loss_fn = Tensor().nll_loss
-        return loss_fn(y_hat=y_hat, y=y)
+        return loss_fn(y_hat=y_hat, y=y, **kwargs)
 
 class CrossEntropyLoss(Layer):
     def __call__(self, y_hat: Tensor, y: Tensor):
@@ -75,3 +75,15 @@ class ReLU(Layer):
     def __call__(self, X: Tensor):
         relu = Tensor().relu
         return relu(X)
+
+
+class Softmax(Layer):
+    def __call__(self, X: Tensor, **kwargs):
+        softmax = Tensor().softmax
+        return softmax(X, **kwargs)
+
+
+class Sum(Layer):
+    def __call__(self, X: Tensor, **kwargs):
+        sum = Tensor().sum
+        return sum(X, **kwargs)
