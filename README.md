@@ -1,6 +1,6 @@
 # Deep Learning from Zer0 series
 
-The aim of this series is to implement a Deep Learning framework from scratch while explaining the theory of each part in blog posts <a href="https://tristanbilot.me/#courses">available here</a>.
+The aim of this series is to implement a Deep Learning framework from scratch while explaining the theory of each part in blog posts <a href="https://tristanbilot.github.io/#/prerequisites">available here</a>.
 
 This framework will be used in the next blogs as a foundation block for the development of more advanced models such as `GNNs`, `VAEs` or `Transformers`.
 
